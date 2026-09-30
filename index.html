@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ruota della Fortuna - TABLET ALUNNO</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Firebase JS SDK v10.8.0 Compat -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  <style>
+    body { touch-action: manipulation; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans select-none">
+
+  <!-- SCHERMATA 1: LOGIN ALUNNO -->
+  <div id="screenLogin" class="flex-1 flex flex-col items-center justify-center p-6">
+    <div class="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center">
+      <div class="text-6xl mb-4">🎡</div>
+      <h1 class="text-2xl font-black text-amber-400 mb-1">Entra in Gioco</h1>
+      <p class="text-xs text-slate-400 mb-6">Inserisci il tuo nome o squadra per connetterti al tabellone della classe.</p>
+
+      <input type="text" id="playerNameInput" placeholder="Il tuo Nome / Squadra..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-4 text-center text-lg font-bold text-slate-100 mb-4 focus:outline-none focus:border-amber-500">
+
+      <button onclick="joinGame()" class="w-full bg-amber-500 hover:bg-amber-400 text-amber-950 font-black py-4 rounded-xl text-lg shadow-lg transition">
+        🚀 ENTRA
+      </button>
+    </div>
+  </div>
+
+  <!-- SCHERMATA 2: LOBBY DI ATTESA -->
+  <div id="screenLobby" class="flex-1 flex flex-col items-center justify-center p-6 hidden">
+    <div class="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center">
+      <div class="inline-block animate-spin text-5xl text-amber-400 mb-4">⏳</div>
+      <h2 class="text-xl font-black text-slate-100 mb-2">Ciao, <span id="lobbyPlayerName" class="text-amber-400">Alunno</span>!</h2>
+      <p class="text-sm text-slate-400 font-medium">In attesa che il docente avvii la partita...</p>
+    </div>
+  </div>
+
+  <!-- SCHERMATA 3: INTERFACCIA GIOCO ATTIVA -->
+  <div id="screenGame" class="flex-1 flex flex-col hidden max-w-md mx-auto w-full p-4 gap-4">
+
+    <!-- HEADER GIOCATORE & PUNTEGGIO -->
+    <header class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex justify-between items-center">
+      <div>
+        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Giocatore</span>
+        <h3 id="gamePlayerName" class="text-base font-black text-slate-100 truncate max-w-[150px]">Alunno</h3>
+      </div>
+      <div class="bg-amber-500/10 border border-amber-500/30 px-4 py-2 rounded-xl text-right">
+        <span class="text-[10px] text-amber-400 font-bold uppercase tracking-wider block">Punteggio</span>
+        <span id="gamePlayerScore" class="text-xl font-black text-amber-400">0 PT</span>
+      </div>
+    </header>
+
+    <!-- PULSANTE SOLUZIONE FRASE COMPLETA -->
+    <button onclick="openSolutionModal()" class="bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-amber-950 font-black p-4 rounded-2xl shadow-xl transition flex items-center justify-center gap-2 text-base border border-yellow-300">
+      💡 TENTA LA SOLUZIONE FRASE (+15 / -15 PT)
+    </button>
+
+    <!-- RIQUADRO DOMANDA ATTIVA -->
+    <div id="questionBox" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col gap-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <span class="text-xs font-bold text-amber-400 flex items-center gap-1">❓ Quesito per la Classe</span>
+        <span id="questionMateria" class="text-[10px] bg-slate-800 text-slate-400 font-bold px-2 py-0.5 rounded">Generale</span>
+      </div>
+
+      <p id="questionText" class="text-sm font-bold text-slate-100 min-h-[40px]">In attesa della prossima domanda...</p>
+
+      <!-- 4 Opzioni Risposta -->
+      <div id="optionsContainer" class="grid grid-cols-1 gap-2">
+        <button disabled class="bg-slate-800 text-slate-500 p-3 rounded-xl text-sm font-bold text-left opacity-50">In attesa domanda...</button>
+      </div>
+
+      <p id="questionStatusText" class="text-xs text-center font-bold text-amber-400 hidden"></p>
+    </div>
+
+    <!-- TASTIERA ALFABETICA -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col gap-3">
+      <div class="flex justify-between items-center">
+        <h4 class="text-xs font-bold text-slate-300">Tastiera Alfabetica</h4>
+        <span id="keyboardStatusBadge" class="text-[10px] bg-rose-500/20 text-rose-400 font-black px-2 py-0.5 rounded uppercase border border-rose-500/30">🔒 BLOCCATA</span>
+      </div>
+
+      <p id="keyboardNotice" class="text-[11px] text-slate-400 italic">
+        🔒 Rispondi correttamente e più velocemente alla domanda per sbloccare la tastiera!
+      </p>
+
+      <!-- Griglia Lettere A-Z -->
+      <div id="keyboardGrid" class="grid grid-cols-7 gap-1.5 opacity-40 pointer-events-none">
+        <!-- Generato via JS -->
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODAL INSERIMENTO SOLUZIONE FRASE -->
+  <div id="solutionModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-2xl shadow-2xl p-6 text-center">
+      <h3 class="text-lg font-black text-amber-400 mb-1">💡 Tenta la Soluzione</h3>
+      <p class="text-xs text-slate-400 mb-4">Scrivi la frase completa. Se indovini guadagni +15 PT, altrimenti perdi 15 PT!</p>
+
+      <input type="text" id="solutionInput" placeholder="Inserisci la frase completa..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-center text-sm font-bold text-slate-100 mb-4 uppercase focus:outline-none focus:border-amber-500">
+
+      <div class="flex gap-2">
+        <button onclick="closeSolutionModal()" class="w-1/2 bg-slate-800 text-slate-300 font-bold py-2.5 rounded-xl text-sm">Annulla</button>
+        <button onclick="submitSolution()" class="w-1/2 bg-amber-500 hover:bg-amber-400 text-amber-950 font-black py-2.5 rounded-xl text-sm">INVIA (+15 / -15 PT)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGICA DI GIOCO TABLET -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDhhtSc2bJTAMKp_jAzd0mUxtIhGzLS6f8",
+      authDomain: "ruotadellafortuna-a3181.firebaseapp.com",
+      databaseURL: "https://ruotadellafortuna-a3181-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "ruotadellafortuna-a3181",
+      storageBucket: "ruotadellafortuna-a3181.firebasestorage.app",
+      messagingSenderId: "926918549896",
+      appId: "1:926918549896:web:b0607a89a1ff98e9f61a3d",
+      measurementId: "G-43S5V4DN9C"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let myPlayerId = localStorage.getItem('rf_player_id') || null;
+    let myPlayerName = localStorage.getItem('rf_player_name') || '';
+    let currentSession = {};
+    let currentQuestionId = null;
+    let answeredCurrentQuestion = false;
+
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderKeyboardGrid();
+
+      if (myPlayerId && myPlayerName) {
+        initPlayerSession();
+      } else {
+        showScreen('screenLogin');
+      }
+    });
+
+    window.addEventListener('beforeunload', leaveGameSession);
+    window.addEventListener('pagehide', leaveGameSession);
+
+    function leaveGameSession() {
+      if (myPlayerId) {
+        db.ref(`players/${myPlayerId}`).remove();
+      }
+    }
+
+    function renderKeyboardGrid() {
+      const grid = document.getElementById('keyboardGrid');
+      grid.innerHTML = alphabet.map(letter => `
+        <button id="btnKey_${letter}" onclick="guessLetter('${letter}')" class="bg-slate-800 text-slate-200 font-black p-2.5 rounded-lg text-sm hover:bg-amber-500 hover:text-amber-950 transition active:scale-95 border border-slate-700">
+          ${letter}
+        </button>
+      `).join('');
+    }
+
+    function joinGame() {
+      const nameInput = document.getElementById('playerNameInput').value.trim();
+      if (!nameInput) return alert("Inserisci il tuo nome!");
+
+      myPlayerId = 'p_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+      myPlayerName = nameInput;
+
+      localStorage.setItem('rf_player_id', myPlayerId);
+      localStorage.setItem('rf_player_name', myPlayerName);
+
+      initPlayerSession();
+    }
+
+    function initPlayerSession() {
+      const playerRef = db.ref(`players/${myPlayerId}`);
+      playerRef.set({
+        id: myPlayerId,
+        name: myPlayerName,
+        score: 0,
+        connected: true
+      });
+
+      playerRef.onDisconnect().remove();
+
+      db.ref(`players/${myPlayerId}`).on('value', snapshot => {
+        const val = snapshot.val();
+        if (!val) {
+          localStorage.removeItem('rf_player_id');
+          localStorage.removeItem('rf_player_name');
+          myPlayerId = null;
+          myPlayerName = '';
+          showScreen('screenLogin');
+          return;
+        }
+
+        document.getElementById('gamePlayerScore').innerText = `${val.score || 0} PT`;
+      });
+
+      db.ref('session').on('value', snapshot => {
+        currentSession = snapshot.val() || {};
+        syncUIWithSession();
+      });
+
+      document.getElementById('lobbyPlayerName').innerText = myPlayerName;
+      document.getElementById('gamePlayerName').innerText = myPlayerName;
+    }
+
+    function showScreen(screenId) {
+      ['screenLogin', 'screenLobby', 'screenGame'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById(screenId).classList.remove('hidden');
+    }
+
+    function syncUIWithSession() {
+      const status = currentSession.status || 'lobby';
+
+      if (status === 'lobby') {
+        answeredCurrentQuestion = false;
+        currentQuestionId = null;
+        showScreen('screenLobby');
+        return;
+      }
+
+      showScreen('screenGame');
+
+      if (status === 'question_active' && currentSession.currentQuestion) {
+        const q = currentSession.currentQuestion;
+        if (currentQuestionId !== q.id) {
+          currentQuestionId = q.id;
+          answeredCurrentQuestion = false;
+        }
+        renderQuestion(q);
+      } else if (status === 'started') {
+        currentQuestionId = null;
+        document.getElementById('questionText').innerText = "In attesa che il docente invii una domanda...";
+        document.getElementById('optionsContainer').innerHTML = `<p class="text-xs text-slate-500 italic text-center py-2">Domanda non attiva al momento.</p>`;
+        document.getElementById('questionStatusText').classList.add('hidden');
+      }
+
+      const isMyTurn = currentSession.activeKeyboardPlayerId === myPlayerId;
+      const kbdGrid = document.getElementById('keyboardGrid');
+      const kbdBadge = document.getElementById('keyboardStatusBadge');
+      const kbdNotice = document.getElementById('keyboardNotice');
+
+      if (isMyTurn) {
+        kbdGrid.classList.remove('opacity-40', 'pointer-events-none');
+        kbdBadge.className = "text-[10px] bg-emerald-500/20 text-emerald-400 font-black px-2 py-0.5 rounded uppercase border border-emerald-500/30 animate-pulse";
+        kbdBadge.innerText = "🎯 TUA TASTIERA!";
+        kbdNotice.innerText = "⚡ SEI IL PIÙ VELOCE! Scegli una lettera per svelarla nel tabellone!";
+      } else {
+        kbdGrid.classList.add('opacity-40', 'pointer-events-none');
+        kbdBadge.className = "text-[10px] bg-rose-500/20 text-rose-400 font-black px-2 py-0.5 rounded uppercase border border-rose-500/30";
+        kbdBadge.innerText = "🔒 BLOCCATA";
+        kbdNotice.innerText = "🔒 Rispondi correttamente e più velocemente alla domanda per sbloccare la tastiera!";
+      }
+
+      const guessed = currentSession.guessedLetters || [];
+      alphabet.forEach(letter => {
+        const btn = document.getElementById(`btnKey_${letter}`);
+        if (btn) {
+          if (guessed.includes(letter)) {
+            btn.disabled = true;
+            btn.className = "bg-slate-900/90 text-slate-600 font-bold p-2.5 rounded-lg text-sm line-through border border-slate-800/80 cursor-not-allowed opacity-40";
+          } else {
+            btn.disabled = false;
+            btn.className = "bg-slate-800 text-slate-200 font-black p-2.5 rounded-lg text-sm hover:bg-amber-500 hover:text-amber-950 transition active:scale-95 border border-slate-700";
+          }
+        }
+      });
+    }
+
+    function renderQuestion(q) {
+      document.getElementById('questionMateria').innerText = q.materia || "Generale";
+      document.getElementById('questionText').innerText = q.question;
+
+      const container = document.getElementById('optionsContainer');
+      const statusText = document.getElementById('questionStatusText');
+
+      if (answeredCurrentQuestion) {
+        statusText.classList.remove('hidden');
+        statusText.innerText = "✅ Risposta inviata! In attesa degli altri compagni...";
+        container.innerHTML = `<p class="text-xs text-slate-500 italic text-center py-2">Risposta registrata.</p>`;
+        return;
+      }
+
+      statusText.classList.add('hidden');
+
+      container.innerHTML = q.options.map((opt, idx) => `
+        <button onclick="submitAnswer(${idx})" class="bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold p-3.5 rounded-xl text-sm text-left transition border border-slate-700 flex items-center gap-2">
+          <span class="w-6 h-6 bg-slate-700 text-amber-400 rounded-full flex items-center justify-center text-xs font-black">${String.fromCharCode(65 + idx)}</span>
+          ${opt}
+        </button>
+      `).join('');
+    }
+
+    function submitAnswer(optionIndex) {
+      if (answeredCurrentQuestion) return;
+      answeredCurrentQuestion = true;
+
+      const q = currentSession.currentQuestion;
+      const isCorrect = optionIndex === q.correctIndex;
+
+      if (isCorrect) {
+        db.ref(`players/${myPlayerId}/score`).transaction(sc => (sc || 0) + 3);
+      } else {
+        db.ref(`players/${myPlayerId}/score`).transaction(sc => (sc || 0) - 1);
+      }
+
+      db.ref(`answers/${myPlayerId}`).set({
+        playerId: myPlayerId,
+        playerName: myPlayerName,
+        answerIndex: optionIndex,
+        isCorrect: isCorrect,
+        timestamp: Date.now()
+      });
+
+      syncUIWithSession();
+    }
+
+    function guessLetter(letter) {
+      if (currentSession.activeKeyboardPlayerId !== myPlayerId) return;
+
+      db.ref('letterGuesses').push({
+        playerId: myPlayerId,
+        letter: letter,
+        status: 'pending',
+        timestamp: Date.now()
+      });
+    }
+
+    function openSolutionModal() { document.getElementById('solutionModal').classList.remove('hidden'); }
+    function closeSolutionModal() { document.getElementById('solutionModal').classList.add('hidden'); }
+
+    function submitSolution() {
+      const input = document.getElementById('solutionInput').value.trim();
+      if (!input) return alert("Inserisci una frase!");
+
+      db.ref('solutionAttempts').push({
+        playerId: myPlayerId,
+        playerName: myPlayerName,
+        attempt: input,
+        status: 'pending',
+        timestamp: Date.now()
+      });
+
+      document.getElementById('solutionInput').value = '';
+      closeSolutionModal();
+      alert("Inviato! Verifica il tabellone per il risultato.");
+    }
+  </script>
+</body>
+</html>
